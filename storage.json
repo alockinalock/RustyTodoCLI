@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Autocomplete",
+    "desc": "Allow the user to press tab to autocomplete a command for the app"
+  },
+  {
+    "name": "Create a colored version of the app",
+    "desc": "Use the colored library for Rust to create a colored variant of the base application. Makes a better looking app."
+  },
+  {
+    "name": "Add a completion status",
+    "desc": "Would flesh out the app more by adding this new feature. You can keep tasks and mark them as completed instead of simply deleting a task when it is finished."
+  },
+  {
+    "name": "Reveal empty strings",
+    "desc": "The user might enter an empty string. This is bad because the program takes it as input but when it prints it out, it's hard to locate the empty string. There needs to be a way to reveal an empty string."
+  },
+  {
+    "name": "Fix formatting",
+    "desc": "Once tasks start getting long descriptions, it's practically unreadable. We need this fixed."
+  }
+]

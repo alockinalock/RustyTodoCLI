@@ -1,7 +1,8 @@
+use colored::*;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io;
-use std::io::{Read, Result, Write}; // We call upon Read, Write, and Result;
+use std::io::{Read, Result, Write};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Task {
@@ -9,7 +10,6 @@ struct Task {
     desc: String,
 }
 
-// TODO: Add another field: status
 fn add_task(task: &mut Vec<Task>) {
     let mut name = String::new();
     let mut description = String::new();
@@ -116,7 +116,6 @@ fn list_names(task: &Vec<Task>) {
     }
 }
 
-// TODO: add color to output.
 fn view_tasks(task: &Vec<Task>) {
     if task.len() == 0 {
         println!("All tasks are completed, good job!");
@@ -127,9 +126,10 @@ fn view_tasks(task: &Vec<Task>) {
     }
 }
 
-// FIXME: if this is implemented, view_tasks and list_names must call upon this json file.
 fn write_to_json(task: &[Task], filename: &str) -> Result<() /*Box<dyn std::error::Error>*/> {
-    let json_data = serde_json::to_string(task)?;
+    let json_data = serde_json::to_string_pretty(task)?;
+
+    println!("JSON data to write: {}", json_data);
 
     let mut file = File::create(filename)?;
     file.write_all(json_data.as_bytes())?;
@@ -137,22 +137,53 @@ fn write_to_json(task: &[Task], filename: &str) -> Result<() /*Box<dyn std::erro
     Ok(())
 }
 
-fn read_from_json(filename: &str) -> Result<Vec<Task>> {
-    let mut file = File::open(filename)?;
+fn read_from_json(filename: &str) -> Vec<Task> {
+    let mut file = File::open(filename).expect("a");
     let mut json_data = String::new();
-    file.read_to_string(&mut json_data)?;
+    file.read_to_string(&mut json_data).expect("c");
 
-    let task: Vec<Task> = serde_json::from_str(&json_data)?;
+    let task: Vec<Task> = serde_json::from_str(&json_data).expect("d");
+    return task;
+}
 
-    Ok(task)
+// TODO: Colored version of the app
+pub fn colored_vers(cache: &str, current_tasks: Vec<Task>) {
+    let mut terminate = false;
+    let mut choice = String::new();
+
+    println!(
+        "{}",
+        "What are you trying to do today?".bold().underline().blue()
+    );
+    println!("{} Add Task", "[mk]".bold().red());
+    println!("{} Remove Task", "[rm]".bold().red());
+    println!("{} Rename Task", "[mv]".bold().red());
+    println!("{} View All Task", "[vw]".bold().red());
+    println!("{} Save Quit", "[wq]".bold().red());
+    println!("{} Force Quit", "[qq]".bold().red());
+
+    io::stdin()
+        .read_line(&mut choice)
+        .expect("Failed to read from the CLI");
+    let choice = choice.trim();
 }
 
 // TODO: empty strings need to be able to be seen
 // TODO: add another function: update status. doesnt delete the task, just updates the status
-// TODO: Better error statements needed
+// TODO: Currently stores information in the same directory as the one it is run in.
+// TODO: Autocomplete for quality of life
 fn main() {
+    let cache = "../../storage.json";
     let mut current_tasks: Vec<Task> = Vec::new();
     println!("{}[2J", 27 as char);
+    current_tasks = read_from_json(cache);
+
+    let dev = false;
+    if dev == true {
+        colored_vers(cache, current_tasks);
+        return;
+    }
+
     loop {
         let mut choice = String::new();
         let mut terminate = false;
@@ -190,7 +221,8 @@ fn main() {
                 println!("---------------------------\n");
             }
             "wq" => {
-                write_to_json(&current_tasks, "storage.json");
+                // We don't handle the error.
+                write_to_json(&current_tasks, cache);
                 terminate = true;
             }
             "qq" => terminate = true,
