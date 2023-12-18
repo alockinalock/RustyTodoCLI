@@ -1,133 +1,214 @@
 use colored::*;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
+use std::fs::{read_link, File};
 use std::io;
 use std::io::{Read, Result, Write};
+use std::ops::Add;
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Task {
+struct Tasks {
     name: String,
     desc: String,
 }
 
-fn add_task(task: &mut Vec<Task>) {
+fn homescreen(new: bool) -> bool {
+    if new == true {
+        println!("Welcome to RustyTodoCLI! A terminal based productivity app which helps you track tasks... in other words, this is a todo planner.");
+        println!("--This message will disappear after you leave this page.--\n");
+    }
+
+    println!(">ADD\nTo add a new task to the list.\n");
+    println!(">REMOVE\nTo remove a task from the list.\n");
+    println!(">RENAME\nTo rename a task in the list.\n");
+    println!(">VIEW\nTo view the list of tasks.\n");
+    println!(">SAVE\nTo save your list.\n");
+    println!(">QUIT\nTo quit the application. WARNING: This does not automatically save any changes made.\n");
+
+    return false;
+}
+
+fn rusty_add(tasks: &mut Vec<Tasks>) {
     let mut name = String::new();
     let mut description = String::new();
-    println!("Enter the name of the new task:");
-    io::stdin().read_line(&mut name);
-    println!("Enter the description for this new task:");
-    io::stdin().read_line(&mut description);
 
-    let new_task = Task {
+    println!("ENTER NAME\n");
+    io::stdin()
+        .read_line(&mut name)
+        .expect("Failed to read name");
+    if name.trim().to_lowercase() == "cancel" {
+        println!("{}[2J", 27 as char);
+        println!("Process terminated. Press ENTER to continue.\n");
+        return;
+    }
+    println!("\n\n\nENTER DESCRIPTION\n");
+    io::stdin()
+        .read_line(&mut description)
+        .expect("Failed to read description");
+    if description.trim().to_lowercase() == "cancel" {
+        println!("{}[2J", 27 as char);
+        println!("Process terminated. Press ENTER to continue.\n");
+        return;
+    }
+
+    let new_task = Tasks {
         name: name.trim().to_string(),
         desc: description.trim().to_string(),
     };
 
-    task.push(new_task);
+    tasks.push(new_task);
+
+    println!("{}[2J", 27 as char);
+    println!(
+        "New task \"{}\" has been added to the list. Press ENTER to continue.\n",
+        name.trim().to_lowercase()
+    );
 }
 
-fn remove_task(task: &mut Vec<Task>) {
-    println!("Which task would you like to remove?");
-    println!("---------------------------------------");
-    view_tasks(task);
-    println!("---------------------------------------");
-    print!("Remove: ");
-    io::stdout().flush();
-    let mut destroy = String::new();
+fn rusty_remove(tasks: &mut Vec<Tasks>) {
+    if tasks.len() == 0 {
+        println!("{}[2J", 27 as char);
+        println!("List contains no tasks; nothing can be removed. Press ENTER to continue.\n");
+        return;
+    }
+
+    println!("Select a task to remove from the list:\n-----------------------------------------------------");
+    rusty_view_name_only(tasks);
+    println!();
+    let mut user_input = String::new();
     io::stdin()
-        .read_line(&mut destroy)
-        .expect("Failed to read input from the CLI");
-    let destroy = destroy.trim();
+        .read_line(&mut user_input)
+        .expect("Failed to read chosen task for removal");
 
-    let mut is_removed = false;
+    loop {
+        // io::stdin().read_line(&mut user_input);
+        if user_input.trim().to_lowercase() == "def" {
+            println!("{}[2J", 27 as char);
+            println!("Select a task to remove from the list:\n-----------------------------------------------------");
+            rusty_view(tasks);
+            println!();
+            user_input.clear();
+            io::stdin()
+                .read_line(&mut user_input)
+                .expect("Failed to read chosen task for removal");
+        } else if user_input.trim().to_lowercase() == "cancel" {
+            println!("{}[2J", 27 as char);
+            println!("Process terminated. Press ENTER to continue.\n");
+            return;
+        } else {
+            break;
+        }
+    }
 
-    task.retain(|t| {
-        if t.name == destroy {
-            is_removed = true;
+    let mut removal_status = false;
+
+    tasks.retain(|t| {
+        if t.name.to_lowercase() == user_input.trim().to_lowercase() {
+            removal_status = true;
             false
         } else {
             true
         }
     });
 
-    if is_removed {
-        println!("\n{} has been removed.", destroy);
-    } else {
+    if removal_status {
+        println!("{}[2J", 27 as char);
         println!(
-            "\nAn error has been encountered. \"{}\" has not been removed from the list.",
-            destroy
+            "Removed \"{}\". You now have {} tasks left. Press ENTER to continue.\n",
+            user_input.trim().to_lowercase(),
+            tasks.len()
         );
+    } else {
+        println!("{}[2J", 27 as char);
+        // FIXME: this error message is stupid.
+        println!("Failed to remove {}. Check if you have mistyped the name and try again.\nIf you have correctly entered the name, and are still seeing this message, something has gone horribly, horribly wrong.\n", user_input.trim().to_lowercase());
     }
 }
 
-fn rename_task(task: &mut Vec<Task>) {
-    println!("Which task would you like to rename?");
-    println!("---------------------------------------");
-    list_names(task);
-    println!("---------------------------------------");
-    print!("Rename: ");
-    io::stdout().flush();
-    let mut changed = String::new();
-    io::stdin()
-        .read_line(&mut changed)
-        .expect("Failed to read from the CLI");
-    let changed = changed.trim();
+fn rusty_rename(tasks: &mut Vec<Tasks>) {
+    if tasks.len() == 0 {
+        println!("{}[2J", 27 as char);
+        println!("List contains no tasks; nothing can be renamed. Press ENTER to continue.\n");
+        return;
+    }
 
-    let mut is_changed = false;
-    let mut renamed_task = Task {
+    println!("Select a task to rename from the list\n-----------------------------------------------------");
+    rusty_view_name_only(tasks);
+    println!();
+    let mut user_input = String::new();
+    io::stdin().read_line(&mut user_input);
+
+    loop {
+        if user_input.trim().to_lowercase() == "def" {
+            println!("{}[2J", 27 as char);
+            println!("Select a task to rename from the list\n-----------------------------------------------------");
+            rusty_view(tasks);
+            println!();
+            user_input.clear();
+            io::stdin().read_line(&mut user_input);
+        } else if user_input.trim().to_lowercase() == "cancel" {
+            println!("{}[2J", 27 as char);
+            println!("Process terminated. Press ENTER to continue.\n");
+            return;
+        } else {
+            break;
+        }
+    }
+
+    let mut renamed_status = false;
+    let mut renamed_task = Tasks {
         name: "".to_string(),
         desc: "".to_string(),
     };
+    let mut new_name = String::new();
 
-    task.retain(|t| {
-        if t.name == changed {
-            println!("What would you like to rename the task to?");
-            let mut new_name = String::new();
-            io::stdin()
-                .read_line(&mut new_name)
-                .expect("Failed to read from CLI");
-            renamed_task = Task {
+    tasks.retain(|t| {
+        if t.name == user_input.trim() {
+            println!("{}[2J", 27 as char);
+            println!(
+                "Enter a new name for \"{}\".\n",
+                user_input.trim().to_lowercase()
+            );
+            io::stdin().read_line(&mut new_name);
+            renamed_task = Tasks {
                 name: new_name.trim().to_string(),
                 desc: t.desc.to_string(),
             };
-            is_changed = true;
+            renamed_status = true;
             false
         } else {
             true
         }
     });
-    task.push(renamed_task);
-    if is_changed {
-        println!("\nTask has been renamed and readded to list.");
-    } else {
+    tasks.push(renamed_task);
+
+    if renamed_status {
+        println!("{}[2J", 27 as char);
         println!(
-            "\nTask has failed to be renamed. Please check if it exists or if you have mistyped it."
+            "Renamed task \"{}\" to \"{}\". Press ENTER to continue.\n",
+            user_input.trim().to_lowercase(),
+            new_name.trim().to_lowercase()
         );
-    }
-}
-
-fn list_names(task: &Vec<Task>) {
-    if task.len() == 0 {
-        println!();
     } else {
-        for t in task {
-            println!("{}", t.name);
-        }
+        println!("{}[2J", 27 as char);
+        // TODO: write a good error msg here
+        println!("the shit failed. woops.\n");
     }
 }
 
-fn view_tasks(task: &Vec<Task>) {
-    if task.len() == 0 {
-        println!("All tasks are completed, good job!");
-    } else {
-        for t in task {
-            println!("{} - {}", t.name, t.desc);
-        }
+fn rusty_view(tasks: &Vec<Tasks>) {
+    for t in tasks {
+        println!("{} - {}", t.name, t.desc);
     }
 }
 
-fn write_to_json(task: &[Task], filename: &str) -> Result<() /*Box<dyn std::error::Error>*/> {
-    let json_data = serde_json::to_string_pretty(task)?;
+fn rusty_view_name_only(tasks: &Vec<Tasks>) {
+    for t in tasks {
+        println!("{}", t.name);
+    }
+}
+
+fn rusty_save(tasks: &[Tasks], filename: &str) -> Result<()> {
+    let json_data = serde_json::to_string_pretty(tasks)?;
 
     println!("JSON data to write: {}", json_data);
 
@@ -137,100 +218,92 @@ fn write_to_json(task: &[Task], filename: &str) -> Result<() /*Box<dyn std::erro
     Ok(())
 }
 
-fn read_from_json(filename: &str) -> Vec<Task> {
+fn rusty_initiate_cache(filename: &str) -> Vec<Tasks> {
     let mut file = File::open(filename).expect("a");
     let mut json_data = String::new();
-    file.read_to_string(&mut json_data).expect("c");
 
-    let task: Vec<Task> = serde_json::from_str(&json_data).expect("d");
-    return task;
+    file.read_to_string(&mut json_data).expect("b");
+
+    let tasks: Vec<Tasks> = serde_json::from_str(&json_data).expect("c");
+    return tasks;
 }
 
-// TODO: Colored version of the app
-pub fn colored_vers(cache: &str, current_tasks: Vec<Task>) {
-    let mut terminate = false;
-    let mut choice = String::new();
+// This function is unused. It could possibly be used to detect unsaved changes later.
+fn rusty_quit() {}
 
-    println!(
-        "{}",
-        "What are you trying to do today?".bold().underline().blue()
-    );
-    println!("{} Add Task", "[mk]".bold().red());
-    println!("{} Remove Task", "[rm]".bold().red());
-    println!("{} Rename Task", "[mv]".bold().red());
-    println!("{} View All Task", "[vw]".bold().red());
-    println!("{} Save Quit", "[wq]".bold().red());
-    println!("{} Force Quit", "[qq]".bold().red());
-
-    io::stdin()
-        .read_line(&mut choice)
-        .expect("Failed to read from the CLI");
-    let choice = choice.trim();
-}
-
-// TODO: empty strings need to be able to be seen
-// TODO: add another function: update status. doesnt delete the task, just updates the status
-// TODO: Currently stores information in the same directory as the one it is run in.
-// TODO: Autocomplete for quality of life
+// TODO: press ENTER to continue is always mentioned, maybe actually look for it?
 fn main() {
-    let cache = "../../storage.json";
-    let mut current_tasks: Vec<Task> = Vec::new();
-    println!("{}[2J", 27 as char);
-    current_tasks = read_from_json(cache);
+    // Declare global variables
+    // ====================================
 
-    let dev = false;
-    if dev == true {
-        colored_vers(cache, current_tasks);
-        return;
-    }
+    let file = "../../storage.json";
+    let mut new_session = true;
+    let mut cache: Vec<Tasks> = rusty_initiate_cache(file);
+    let mut void = String::new();
+
+    // ====================================
 
     loop {
-        let mut choice = String::new();
-        let mut terminate = false;
+        println!("{}[2J", 27 as char);
+        let mut option = String::new();
 
-        println!("What are you trying to do today?");
-        println!("---------------------------------------");
-
-        println!("[mk] Add Task \n[rm] Remove Task \n[mv] Rename Task \n[vw] View All Tasks \n[wq] Save Quit \n[qq] Force Quit");
+        new_session = homescreen(new_session);
         io::stdin()
-            .read_line(&mut choice)
-            .expect("Failed to read from the CLI");
-        let choice = choice.trim();
+            .read_line(&mut option)
+            .expect("Failed to read chosen option from user.");
+        let option = option.trim();
 
-        match choice {
-            "mk" => {
+        match option {
+            "add" => {
                 println!("{}[2J", 27 as char);
-                add_task(&mut current_tasks);
-                println!();
+                rusty_add(&mut cache);
+                io::stdin().read_line(&mut void);
             }
-            "rm" => {
+            "remove" => {
                 println!("{}[2J", 27 as char);
-                remove_task(&mut current_tasks);
-                println!();
+                rusty_remove(&mut cache);
+                io::stdin().read_line(&mut void);
             }
-            "mv" => {
+            "rename" => {
                 println!("{}[2J", 27 as char);
-                rename_task(&mut current_tasks);
-                println!();
+                rusty_rename(&mut cache);
+                io::stdin().read_line(&mut void);
             }
-            "vw" => {
+            "view" => {
                 println!("{}[2J", 27 as char);
-                println!("Here are all your tasks:");
-                println!("---------------------------");
-                view_tasks(&mut current_tasks);
-                println!("---------------------------\n");
+                if cache.len() == 0 {
+                    println!(
+                        "There are no active tasks that can be listed. Press ENTER to continue."
+                    );
+                } else {
+                    println!("All active tasks are listed below.\n-----------------------------------------------------");
+                    rusty_view(&mut cache);
+                }
+                println!("\n\nPress ENTER when you are finished.\n");
+                io::stdin().read_line(&mut void);
             }
-            "wq" => {
-                // We don't handle the error.
-                write_to_json(&current_tasks, cache);
-                terminate = true;
+            "save" => {
+                rusty_save(&cache, file);
+                println!("{}[2J", 27 as char);
+                println!("Data has been saved. Press ENTER to continue.\n");
+                io::stdin().read_line(&mut void);
             }
-            "qq" => terminate = true,
-            _ => println!("Not a valid command.\n\n\n"),
-        }
-        if terminate {
-            println!("{}[2J", 27 as char);
-            break;
+            "quit" => {
+                println!("{}[2J", 27 as char);
+                return;
+            }
+            "" => {
+                println!("{}[2J", 27 as char);
+                println!("No command entered. Please enter a command. Press ENTER to return back to the list of commands.\n");
+                io::stdin().read_line(&mut void);
+            }
+            _ => {
+                println!("{}[2J", 27 as char);
+                println!(
+                    "Command is invalid. Press ENTER to return back to the list of commands.\n"
+                );
+                io::stdin().read_line(&mut void);
+            }
         }
     }
 }

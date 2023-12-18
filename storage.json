@@ -18,5 +18,9 @@
   {
     "name": "Fix formatting",
     "desc": "Once tasks start getting long descriptions, it's practically unreadable. We need this fixed."
+  },
+  {
+    "name": "Find root directory",
+    "desc": "The app currently relies on the fact that the executable is located in one, specific directory. This is not viable for release."
   }
 ]
