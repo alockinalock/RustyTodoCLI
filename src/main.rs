@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::fs::{read_link, File};
 use std::io;
 use std::io::{Read, Result, Write};
-use std::ops::Add;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Tasks {
@@ -22,6 +21,7 @@ fn homescreen(new: bool) -> bool {
     println!(">RENAME\nTo rename a task in the list.\n");
     println!(">VIEW\nTo view the list of tasks.\n");
     println!(">SAVE\nTo save your list.\n");
+    // This is weird way of telling the user that this command does not save.
     println!(">QUIT\nTo quit the application. WARNING: This does not automatically save any changes made.\n");
 
     return false;
@@ -120,7 +120,10 @@ fn rusty_remove(tasks: &mut Vec<Tasks>) {
     } else {
         println!("{}[2J", 27 as char);
         // FIXME: this error message is stupid.
-        println!("Failed to remove {}. Check if you have mistyped the name and try again.\nIf you have correctly entered the name, and are still seeing this message, something has gone horribly, horribly wrong.\n", user_input.trim().to_lowercase());
+        println!(
+            "Failed to remove \"{}\".\n",
+            user_input.trim().to_lowercase()
+        );
     }
 }
 
@@ -232,6 +235,8 @@ fn rusty_initiate_cache(filename: &str) -> Vec<Tasks> {
 fn rusty_quit() {}
 
 // TODO: press ENTER to continue is always mentioned, maybe actually look for it?
+// TODO: help option which lists all possible commands
+// FIXME: caps lock versions of the command names simply do NOT work.
 fn main() {
     // Declare global variables
     // ====================================
@@ -251,9 +256,9 @@ fn main() {
         io::stdin()
             .read_line(&mut option)
             .expect("Failed to read chosen option from user.");
-        let option = option.trim();
+        let option = option.trim().to_lowercase();
 
-        match option {
+        match option.as_str() {
             "add" => {
                 println!("{}[2J", 27 as char);
                 rusty_add(&mut cache);
@@ -279,7 +284,7 @@ fn main() {
                     println!("All active tasks are listed below.\n-----------------------------------------------------");
                     rusty_view(&mut cache);
                 }
-                println!("\n\nPress ENTER when you are finished.\n");
+                println!("\n\n\nPress ENTER when you are finished.\n");
                 io::stdin().read_line(&mut void);
             }
             "save" => {
