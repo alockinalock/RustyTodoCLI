@@ -119,7 +119,7 @@ fn rusty_remove(tasks: &mut Vec<Tasks>) {
         );
     } else {
         println!("{}[2J", 27 as char);
-        // FIXME: this error message is stupid.
+        // FIXME: this error message is vague.
         println!(
             "Failed to remove \"{}\".\n",
             user_input.trim().to_lowercase()
@@ -198,6 +198,8 @@ fn rusty_rename(tasks: &mut Vec<Tasks>) {
     }
 }
 
+// TODO: Format the view command. Tasks with long description make this command look awful.
+// This is mainly a problem for smaller windows. When a terminal window is maximized, it looks ok.
 fn rusty_view(tasks: &Vec<Tasks>) {
     for t in tasks {
         println!("{} - {}", t.name, t.desc);
@@ -208,6 +210,24 @@ fn rusty_view_name_only(tasks: &Vec<Tasks>) {
     for t in tasks {
         println!("{}", t.name);
     }
+}
+
+fn define_task(tasks: &mut Vec<Tasks>, command: String) {
+    let task_name = &command[4..];
+    let mut obtained_desc = String::new();
+    let mut status = false;
+
+    tasks.retain(|t| {
+        if task_name == t.name {
+            // This is a dumb way of moving out t.desc, oh well.
+            let obtained = &t.desc;
+            obtained_desc = obtained.to_string();
+            status = true;
+            false
+        } else {
+            true
+        }
+    });
 }
 
 fn rusty_save(tasks: &[Tasks], filename: &str) -> Result<()> {
@@ -236,7 +256,7 @@ fn rusty_quit() {}
 
 // TODO: press ENTER to continue is always mentioned, maybe actually look for it?
 // TODO: help option which lists all possible commands
-// FIXME: caps lock versions of the command names simply do NOT work.
+// TODO: write tests.
 fn main() {
     // Declare global variables
     // ====================================
